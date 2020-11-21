@@ -1,22 +1,20 @@
-import uuid
 from typing import Union, Optional, Sequence
 
-from ..document import Document
 from ..querylang import QueryLang
 from ..sets import QueryLangSet, DocumentSet
 from ...drivers import BaseDriver
-from ...enums import CompressAlgo, ClientMode
+from ...enums import CompressAlgo, RequestType
 from ...helper import typename
 from ...proto import jina_pb2
 
+_body_type = set(str(v).lower() for v in RequestType)
 _trigger_body_fields = set(kk
                            for v in [jina_pb2.RequestProto.IndexRequestProto,
                                      jina_pb2.RequestProto.SearchRequestProto,
                                      jina_pb2.RequestProto.TrainRequestProto,
                                      jina_pb2.RequestProto.ControlRequestProto]
                            for kk in v.DESCRIPTOR.fields_by_name.keys())
-_trigger_req_fields = set(jina_pb2.RequestProto.DESCRIPTOR.fields_by_name.keys()).difference(
-    {'train', 'index', 'search', 'control'})
+_trigger_req_fields = set(jina_pb2.RequestProto.DESCRIPTOR.fields_by_name.keys()).difference(_body_type)
 _trigger_fields = _trigger_req_fields.union(_trigger_body_fields)
 _empty_request = jina_pb2.RequestProto()
 
@@ -59,7 +57,7 @@ class Request:
         elif request is None:
             self._request = jina_pb2.RequestProto()
             # make sure every new request has a request id
-            self._request.request_id = uuid.uuid1().hex
+            self._request.request_id = get_random_identity()
 
         self._envelope = envelope
         self.is_used = False  #: Return True when request has been r/w at least once
@@ -67,28 +65,47 @@ class Request:
     def __getattr__(self, name: str):
         # https://docs.python.org/3/reference/datamodel.html#object.__getattr__
         if name in _trigger_body_fields:
-            req = getattr(self.as_pb_object, self.request_type)
-            return getattr(req, name)
+            return getattr(self.body, name)
         elif hasattr(_empty_request, name):
             return getattr(self.as_pb_object, name)
         else:
             raise AttributeError
 
     @property
-    def request_type(self) -> str:
+    def body(self):
+        if self._request_type:
+            return getattr(self.as_pb_object, self._request_type)
+        else:
+            raise ValueError(f'"request_type" is not set yet')
+
+    @property
+    def _request_type(self) -> str:
         return self.as_pb_object.WhichOneof('body')
+
+    @property
+    def request_type(self) -> Optional[str]:
+        """Return the request body type, when not set yet, return ``None``"""
+        if self._request_type:
+            return self.body.__class__.__name__
+
+    @request_type.setter
+    def request_type(self, value: str):
+        """Set the type of this request, but keep the body empty"""
+        value = value.lower()
+        if value in _body_type:
+            getattr(self.as_pb_object, value).SetInParent()
+        else:
+            raise ValueError(f'{value} is not valid, must be one of {_body_type}')
 
     @property
     def docs(self) -> 'DocumentSet':
         self.is_used = True
-        req = getattr(self.as_pb_object, self.request_type)
-        return DocumentSet(req.docs)
+        return DocumentSet(self.body.docs)
 
     @property
     def groundtruths(self) -> 'DocumentSet':
         self.is_used = True
-        req = getattr(self.as_pb_object, self.request_type)
-        return DocumentSet(req.groundtruths)
+        return DocumentSet(self.body.groundtruths)
 
     @staticmethod
     def _decompress(data: bytes, algorithm: str) -> bytes:
@@ -147,30 +164,6 @@ class Request:
             # no touch, skip serialization, return original
             return self._buffer
 
-    def add_document(self, document: 'Document', request_type: Optional['ClientMode'] = None):
-        """Add a document to the request
-
-        :param document: document to add
-        :param request_type: the type of request to add to, when not given then will always add to existing type
-        """
-        if not self.request_type and request_type is None:
-            raise TypeError(f'request_type must be specified as one of {list(ClientMode)}')
-        _req = getattr(self.as_pb_object, str(request_type).lower() if request_type is not None else self.request_type)
-        d = _req.docs.add()
-        d.CopyFrom(document.as_pb_object)
-
-    def add_groundtruth(self, document: 'Document', request_type: Optional['ClientMode'] = None):
-        """Add a groundtruth document to the request
-
-        :param document: groundtruth document to add
-        :param request_type: the type of request to add to, when not given then will always add to existing type
-        """
-        if not self.request_type and request_type is None:
-            raise TypeError(f'request_type must be specified as one of {list(ClientMode)}')
-        _req = getattr(self.as_pb_object, str(request_type).lower() if request_type is not None else self.request_type)
-        d = _req.groundtruths.add()
-        d.CopyFrom(document.as_pb_object)
-
     def extend_queryset(self, queryset: AcceptQuerySetType):
         """Extend the queryset of the request """
         if not isinstance(queryset, Sequence):
@@ -190,3 +183,8 @@ class Request:
     def queryset(self) -> 'QueryLangSet':
         self.is_used = True
         return QueryLangSet(self.as_pb_object.queryset)
+
+    @property
+    def command(self) -> str:
+        self.is_used = True
+        return jina_pb2.RequestProto.ControlRequestProto.Command.Name(self.as_pb_object.control.command)
