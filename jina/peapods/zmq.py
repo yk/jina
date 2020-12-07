@@ -302,7 +302,6 @@ class CtrlZmqlet(AsyncZmqlet):
     def __init__(self, address: 'str' = None,
                  is_bind: 'bool' = True, is_async: 'bool' = True, timeout: int = -1) -> None:
         self.socket_type = SocketType.PAIR_BIND if is_bind else SocketType.PAIR_CONNECT
-        self._is_async = is_async
         self.timeout = timeout
         self.is_closed = False
         self.opened_socks = []
