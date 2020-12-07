@@ -4,8 +4,7 @@ __license__ = "Apache-2.0"
 import asyncio
 from typing import Dict, Union, Callable
 
-from .python.helper import callback_exec, pprint_routes
-from ..excepts import GRPCServerError
+from ..helper import configure_event_loop
 from ..logging import JinaLogger
 from ..peapods.pea import BasePea
 from ..peapods.zmq import CtrlZmqlet
@@ -129,7 +128,7 @@ class PyClientRuntime(BasePea):
 
     def loop_body(self):
         from .python import PyClient
-        PyClient.configure_event_loop()
+        configure_event_loop()
         self.grpc_client = PyClient(args=self.args, address=self._address)
         self.is_ready_event.set()
         asyncio.get_event_loop().run_until_complete(self._loop_body())
