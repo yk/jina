@@ -4,6 +4,7 @@ __license__ = "Apache-2.0"
 import asyncio
 from typing import Dict, Union, Callable
 
+from ..excepts import GRPCServerError
 from ..helper import configure_event_loop
 from ..logging import JinaLogger
 from ..peapods.pea import BasePea
@@ -13,7 +14,7 @@ from ..proto.serializer import RequestProto
 if False:
     import argparse
     from ..types.request import Request
-    from .python import PyClient, InputFnType
+    from .python import PyClient, InputFnType, callback_exec, pprint_routes
 
 
 def py_client(**kwargs) -> 'PyClient':
