@@ -149,6 +149,46 @@ def set_hub_list_parser(parser=None):
     return parser
 
 
+def set_zmqlet_parser(parser=None):
+    from .enums import SocketType
+    from .helper import random_port
+    from . import __default_host__
+
+    if not parser:
+        parser = set_base_parser()
+
+    gp2 = add_arg_group(parser, 'pea network arguments')
+    gp2.add_argument('--port-in', type=int, default=random_port(),
+                     help='port for input data, default a random port between [49152, 65535]')
+    gp2.add_argument('--port-out', type=int, default=random_port(),
+                     help='port for output data, default a random port between [49152, 65535]')
+    gp2.add_argument('--host-in', type=str, default=__default_host__,
+                     help=f'host address for input, by default it is {__default_host__}')
+    gp2.add_argument('--host-out', type=str, default=__default_host__,
+                     help=f'host address for output, by default it is {__default_host__}')
+    gp2.add_argument('--socket-in', type=SocketType.from_string, choices=list(SocketType),
+                     default=SocketType.PULL_BIND,
+                     help='socket type for input port')
+    gp2.add_argument('--socket-out', type=SocketType.from_string, choices=list(SocketType),
+                     default=SocketType.PUSH_BIND,
+                     help='socket type for output port')
+    gp2.add_argument('--port-ctrl', type=int, default=os.environ.get('JINA_CONTROL_PORT', random_port()),
+                     help='port for controlling the pod, default a random port between [49152, 65535]')
+    gp2.add_argument('--ctrl-with-ipc', action='store_true', default=False,
+                     help='use ipc protocol for control socket')
+    gp2.add_argument('--timeout', type=int, default=-1,
+                     help='timeout (ms) of all requests, -1 for waiting forever')
+    gp2.add_argument('--timeout-ctrl', type=int, default=5000,
+                     help='timeout (ms) of the control request, -1 for waiting forever')
+    gp2.add_argument('--timeout-ready', type=int, default=10000,
+                     help='timeout (ms) of a pea is ready for request, -1 for waiting forever')
+    gp2.add_argument('--expose-public', action='store_true', default=False,
+                     help='expose the public IP address to remote when necessary, by default it exposes'
+                          'private IP address, which only allows accessing under the same network/subnet')
+
+    return parser
+
+
 def set_hw_parser(parser=None):
     if not parser:
         parser = set_base_parser()
@@ -236,9 +276,8 @@ def set_flow_parser(parser=None):
 
 
 def set_pea_parser(parser=None):
-    from .enums import SocketType, PeaRoleType, SkipOnErrorType
-    from .helper import random_port, get_random_identity
-    from . import __default_host__
+    from .enums import PeaRoleType, SkipOnErrorType
+    from .helper import get_random_identity
 
     if not parser:
         parser = set_base_parser()
@@ -272,34 +311,7 @@ def set_pea_parser(parser=None):
                           'they will be mounted to the root path, i.e. /user/test/my-workspace will be mounted to '
                           '/my-workspace inside the container. all volumes are mounted with read-write mode.')
 
-    gp2 = add_arg_group(parser, 'pea network arguments')
-    gp2.add_argument('--port-in', type=int, default=random_port(),
-                     help='port for input data, default a random port between [49152, 65535]')
-    gp2.add_argument('--port-out', type=int, default=random_port(),
-                     help='port for output data, default a random port between [49152, 65535]')
-    gp2.add_argument('--host-in', type=str, default=__default_host__,
-                     help=f'host address for input, by default it is {__default_host__}')
-    gp2.add_argument('--host-out', type=str, default=__default_host__,
-                     help=f'host address for output, by default it is {__default_host__}')
-    gp2.add_argument('--socket-in', type=SocketType.from_string, choices=list(SocketType),
-                     default=SocketType.PULL_BIND,
-                     help='socket type for input port')
-    gp2.add_argument('--socket-out', type=SocketType.from_string, choices=list(SocketType),
-                     default=SocketType.PUSH_BIND,
-                     help='socket type for output port')
-    gp2.add_argument('--port-ctrl', type=int, default=os.environ.get('JINA_CONTROL_PORT', random_port()),
-                     help='port for controlling the pod, default a random port between [49152, 65535]')
-    gp2.add_argument('--ctrl-with-ipc', action='store_true', default=False,
-                     help='use ipc protocol for control socket')
-    gp2.add_argument('--timeout', type=int, default=-1,
-                     help='timeout (ms) of all requests, -1 for waiting forever')
-    gp2.add_argument('--timeout-ctrl', type=int, default=5000,
-                     help='timeout (ms) of the control request, -1 for waiting forever')
-    gp2.add_argument('--timeout-ready', type=int, default=10000,
-                     help='timeout (ms) of a pea is ready for request, -1 for waiting forever')
-    gp2.add_argument('--expose-public', action='store_true', default=False,
-                     help='expose the public IP address to remote when necessary, by default it exposes'
-                          'private IP address, which only allows accessing under the same network/subnet')
+    set_zmqlet_parser(parser)
 
     gp3 = add_arg_group(parser, 'pea IO arguments')
     gp3.add_argument('--dump-interval', type=int, default=240,
@@ -553,6 +565,8 @@ def set_client_cli_parser(parser=None):
                      help='skip dry run (connectivity test) before sending every request')
     gp1.add_argument('--continue-on-error', action='store_true', default=False,
                      help='if to continue when callback function throws an error')
+    gp1.add_argument('--name', type=str, default='client',
+                     help='the name of the client' if _SHOW_ALL_ARGS else argparse.SUPPRESS)
     return parser
 
 

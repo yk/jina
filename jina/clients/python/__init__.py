@@ -100,8 +100,7 @@ class PyClient(AsyncGrpcClient):
     def configure_zmqlet(self):
         """ We use this method to create a PAIR-BIND socket
         """
-        self.zmqlet = CtrlZmqlet(args=self.args, logger=self.logger, address=self._address,
-                                 is_bind=True, is_async=True, timeout=10000)
+        self.zmqlet = CtrlZmqlet(address=self._address, is_bind=True)
 
     async def call_unary(self, data: Union[GeneratorSourceType], mode: RequestType, **kwargs) -> None:
         """ Calling the server with one request only, and return the result

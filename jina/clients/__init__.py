@@ -4,12 +4,12 @@ __license__ = "Apache-2.0"
 import asyncio
 from typing import Dict, Union, Callable
 
+from .python.helper import callback_exec, pprint_routes
+from ..excepts import GRPCServerError
 from ..logging import JinaLogger
 from ..peapods.pea import BasePea
 from ..peapods.zmq import CtrlZmqlet
-from ..excepts import GRPCServerError
 from ..proto.serializer import RequestProto
-from .python.helper import callback_exec, pprint_routes
 
 if False:
     import argparse
@@ -65,7 +65,7 @@ def py_client_runtime(mode, input_fn, output_fn, **kwargs) -> None:
     args.runtime = 'process'
 
     with JinaLogger(context='PyClientRuntime') as logger:
-        with CtrlZmqlet(args=args, logger=logger, is_bind=False, is_async=False, timeout=10000) as zmqlet:
+        with CtrlZmqlet(is_bind=False) as zmqlet:
             # note: we don't use async zmq context here on the main process
             with PyClientRuntime(args, mode=mode, input_fn=input_fn, output_fn=output_fn,
                                  address=zmqlet.address, **kwargs):
@@ -89,6 +89,7 @@ def py_client_runtime(mode, input_fn, output_fn, **kwargs) -> None:
                     except Again:
                         logger.warning(f'waited for 10 secs for PyClient to respond. breaking')
                         break
+
 
 class PyClientRuntime(BasePea):
     """ This class allows `PyClient` to run in a different process/thread"""

@@ -5,7 +5,7 @@ import asyncio
 import os
 import tempfile
 import time
-from typing import List, Callable, Union, Tuple
+from typing import List, Callable, Union, Tuple, Optional
 
 import zmq
 import zmq.asyncio
@@ -45,17 +45,17 @@ class Zmqlet:
         self.name = args.name or self.__class__.__name__
         self.logger = logger
         self.send_recv_kwargs = vars(args)
-        self.ctrl_addr, self.ctrl_with_ipc = self.get_ctrl_address(args.host, args.port_ctrl, args.ctrl_with_ipc)
         self.bytes_sent = 0
         self.bytes_recv = 0
         self.msg_recv = 0
         self.msg_sent = 0
         self.is_closed = False
         self.opened_socks = []  # this must be here for `close()`
+        self.ctrl_addr, self.ctrl_with_ipc = self.get_ctrl_address(args.host, args.port_ctrl, args.ctrl_with_ipc)
         self.ctx, self.in_sock, self.out_sock, self.ctrl_sock = self.init_sockets()
         self.register_pollin()
 
-        self.opened_socks.extend([self.in_sock, self.out_sock, self.ctrl_sock])
+        self.opened_socks.extend(s for s in [self.in_sock, self.out_sock, self.ctrl_sock] if s)
         if self.in_sock_type == zmq.DEALER:
             self.send_idle()
 
@@ -75,7 +75,7 @@ class Zmqlet:
         self.poller.register(self.in_sock)
 
     @staticmethod
-    def get_ctrl_address(host: str, port_ctrl: str, ctrl_with_ipc: bool) -> Tuple[str, bool]:
+    def get_ctrl_address(host: Optional[str], port_ctrl: Optional[str], ctrl_with_ipc: bool) -> Tuple[str, bool]:
         """Get the address of the control socket
 
         :param host: the host in the arguments
@@ -87,11 +87,12 @@ class Zmqlet:
             - a bool of whether using IPC protocol for controlling
 
         """
-        host_out = host
+
         ctrl_with_ipc = (os.name != 'nt') and ctrl_with_ipc
         if ctrl_with_ipc:
             return _get_random_ipc(), ctrl_with_ipc
         else:
+            host_out = host
             if '@' in host_out:
                 # user@hostname
                 host_out = host_out.split('@')[-1]
@@ -297,10 +298,9 @@ class CtrlZmqlet(AsyncZmqlet):
     :param timeout: timeout for sockets to avoid hang
 
     """
-    def __init__(self, args: 'argparse.Namespace', logger: 'JinaLogger', address: 'str' = None,
+
+    def __init__(self, address: 'str' = None,
                  is_bind: 'bool' = True, is_async: 'bool' = True, timeout: int = -1) -> None:
-        self.args = args
-        self.logger = logger
         self.socket_type = SocketType.PAIR_BIND if is_bind else SocketType.PAIR_CONNECT
         self._is_async = is_async
         self.timeout = timeout
@@ -319,9 +319,7 @@ class CtrlZmqlet(AsyncZmqlet):
         self.poller.register(self.sock, zmq.POLLIN)
 
     def _get_zmq_ctx(self):
-        if self._is_async:
-            return zmq.asyncio.Context()
-        return zmq.Context()
+        return zmq.asyncio.Context()
 
     def set_timeout(self):
         self.sock.setsockopt(zmq.SNDTIMEO, self.timeout)
@@ -335,7 +333,6 @@ class CtrlZmqlet(AsyncZmqlet):
         ctx = self._get_zmq_ctx()
         try:
             sock, _ = _init_socket(ctx, self.address, None, self.socket_type, use_ipc=True)
-            self.logger.info(f'control only: over {colored(self.address, "yellow")} ({self.socket_type.name})')
             return ctx, sock
 
         except zmq.error.ZMQError as ex:
@@ -612,8 +609,8 @@ def _get_random_ipc() -> str:
     return f'ipc://{tmp}'
 
 
-def _init_socket(ctx: 'zmq.Context', host: str, port: int,
-                 socket_type: 'SocketType', identity: 'str' = None,
+def _init_socket(ctx: 'zmq.Context', host: str, port: Optional[int],
+                 socket_type: 'SocketType', identity: str = None,
                  use_ipc: bool = False, ssh_server: str = None,
                  ssh_keyfile: str = None, ssh_password: str = None) -> Tuple['zmq.Socket', str]:
     sock = {
