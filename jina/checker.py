@@ -7,16 +7,13 @@ from . import __jina_env__
 from .helper import colored
 from .importer import import_classes, _print_dep_tree_rst
 from .logging import default_logger
-
-if False:
-    # fix type-hint complain for sphinx and flake
-    import argparse
+from .parser import ArgNamespace
 
 
 class ImportChecker:
     """Check all executors, drivers and handler functions in the package. """
 
-    def __init__(self, args: 'argparse.Namespace'):
+    def __init__(self, args: 'ArgNamespace'):
         default_logger.info('\navailable core executors\n'.upper())
 
         _r = import_classes('jina.executors', show_import_table=True, import_once=False)
@@ -50,7 +47,7 @@ class ImportChecker:
 class NetworkChecker:
     """Check if a BasePod is running or not """
 
-    def __init__(self, args: 'argparse.Namespace'):
+    def __init__(self, args: 'ArgNamespace'):
         from .peapods.zmq import send_ctrl_message
         from .logging.profile import TimeContext
         from google.protobuf.json_format import MessageToJson

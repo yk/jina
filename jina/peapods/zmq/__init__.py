@@ -33,7 +33,7 @@ class Zmqlet:
         It requires :mod:`tornado` and :mod:`uvloop` to be installed.
     """
 
-    def __init__(self, args: 'argparse.Namespace', logger: 'JinaLogger' = None):
+    def __init__(self, args: 'ArgNamespace', logger: 'JinaLogger' = None):
         """
 
         :param args: the parsed arguments from the CLI

@@ -1,15 +1,13 @@
-import argparse
 import multiprocessing
 import threading
 from multiprocessing.synchronize import Event
-from typing import Dict, Union
 
-from jina.peapods.zmq import send_ctrl_message, Zmqlet
-from jina.enums import PeaRoleType
-from jina.excepts import PeaFailToStart
-
-from jina.helper import typename
-from jina.logging import JinaLogger
+from ...enums import PeaRoleType
+from ...excepts import PeaFailToStart
+from ...helper import typename
+from ...logging import JinaLogger
+from ..zmq import send_ctrl_message, Zmqlet
+from ...parser import ArgNamespace
 
 __all__ = ['BaseRuntime']
 
@@ -84,14 +82,13 @@ class RuntimeMeta(type):
 
 
 class BaseRuntime(metaclass=RuntimeMeta):
-
     """BaseRuntime is a process or thread providing the support to run different :class:`BasePea` in different environments.
     It manages the lifetime of these `BasePea` objects living in `Local`, `Remote`, or `Container` environment.
 
     Inherited classes must define their own `run` method that is the one that will be run in a separate process or thread than the main process
     """
 
-    def __init__(self, args: Union['argparse.Namespace', Dict]):
+    def __init__(self, args: 'ArgNamespace'):
         super().__init__()
         self.args = args
         self.name = self.__class__.__name__  #: this is the process name
@@ -140,7 +137,7 @@ class BaseRuntime(metaclass=RuntimeMeta):
         if self.ready_or_shutdown.wait(_timeout):
             if self.is_shutdown.is_set():
                 # return too early and the shutdown is set, means something fails!!
-                self.logger.critical(f'fails to start {typename(self)} with name {self.name}, '	
+                self.logger.critical(f'fails to start {typename(self)} with name {self.name}, '
                                      f'this often means the executor used in the pod is not valid')
                 raise PeaFailToStart
             else:

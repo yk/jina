@@ -1,13 +1,12 @@
 __copyright__ = "Copyright (c) 2020 Jina AI Limited. All rights reserved."
 __license__ = "Apache-2.0"
 
-import argparse
 import os
 import time
 from collections import defaultdict
 from contextlib import ExitStack
-from typing import Dict, Optional, Union, List
 from multiprocessing.synchronize import Event
+from typing import Dict, List
 
 import zmq
 
@@ -21,6 +20,7 @@ from ...executors import BaseExecutor
 from ...helper import is_valid_local_config_source
 from ...logging import JinaLogger
 from ...logging.profile import used_memory, TimeDict
+from ...parser import ArgNamespace
 from ...proto import jina_pb2
 
 __all__ = ['BasePea']
@@ -31,7 +31,7 @@ class BasePea(ExitStack):
     communicates with others via protobuf and ZeroMQ. It also is a context manager of an Executor .
     """
 
-    def __init__(self, args: Union['argparse.Namespace', Dict], **kwargs):
+    def __init__(self, args: 'ArgNamespace', **kwargs):
         """ Create a new :class:`BasePea` object
 
         :param args: the arguments received from the CLI
@@ -305,27 +305,3 @@ class BasePea(ExitStack):
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         super().__exit__(exc_type, exc_val, exc_tb)
         self._teardown()
-
-
-def Pea(args: Optional['argparse.Namespace'] = None,
-        gateway: bool = False,
-        rest_api: bool = False,
-        **kwargs):
-    """Initialize a :class:`BasePea`, :class:`HeadPea`, :class:`TailPea`, or :class:`GatewayPea` or :class: `RESTGatewayPea`
-
-    :param args: arguments from CLI
-    :param gateway: true if gateway pea to be instantiated
-    :param rest_api: true if gateway pea to be instantiated with REST (only considered if gateway is True)
-
-    """
-    if gateway:
-        from .gateway import GatewayPea, RESTGatewayPea
-        return RESTGatewayPea(args, **kwargs) if rest_api else GatewayPea(args, **kwargs)
-    elif args.role == PeaRoleType.HEAD:
-        from .headtail import HeadPea
-        return HeadPea(args)
-    elif args.role == PeaRoleType.TAIL:
-        from .headtail import TailPea
-        return TailPea(args)
-    else:
-        return BasePea(args)

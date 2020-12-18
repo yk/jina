@@ -2,26 +2,23 @@ __copyright__ = "Copyright (c) 2020 Jina AI Limited. All rights reserved."
 __license__ = "Apache-2.0"
 
 import argparse
-from typing import Dict, Union
 
 from .. import BasePea
 from ....logging import JinaLogger
+from ....parser import ArgNamespace
 
 
 class HeadPea(BasePea):
 
     def __init__(self,
-                 args: Union['argparse.Namespace', Dict],
+                 args: 'ArgNamespace',
                  **kwargs):
         super().__init__(args, **kwargs)
         self.name = self.__class__.__name__
-        if isinstance(self.args, argparse.Namespace):
-            if self.args.name:
-                self.name = self.args.name
-                self.name = f'{self.name}-head'
-            self.logger = JinaLogger(self.name, **vars(self.args))
-        else:
-            self.logger = JinaLogger(self.name)
+        if self.args.name:
+            self.name = self.args.name
+            self.name = f'{self.name}-head'
+        self.logger = JinaLogger(self.name, **self.args.to_dict())
 
     def __str__(self):
         return self.name

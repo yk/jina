@@ -6,13 +6,13 @@ import sys
 
 def _get_run_args(print_args: bool = True):
     from jina.logging import default_logger
-    from jina.parser import get_main_parser
+    from jina.parser import get_main_parser, ArgNamespace
     from jina.helper import colored
 
     parser = get_main_parser()
     if len(sys.argv) > 1:
         from argparse import _StoreAction, _StoreTrueAction
-        args = parser.parse_args()
+        args = ArgNamespace(parser.parse_args())
         if print_args:
             from pkg_resources import resource_filename
             p = parser._actions[-1].choices[sys.argv[1]]
@@ -22,7 +22,7 @@ def _get_run_args(print_args: bool = True):
             with open(resource_filename('jina', '/'.join(('resources', 'jina.logo')))) as fp:
                 logo_str = fp.read()
             param_str = []
-            for k, v in sorted(vars(args).items()):
+            for k, v in sorted(args.to_dict().items()):
                 j = f'{k.replace("_", "-"): >30.30} = {str(v):30.30}'
                 if default_args.get(k, None) == v:
                     param_str.append('   ' + j)

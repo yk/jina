@@ -8,14 +8,12 @@ from .. import __default_host__
 from ..enums import RemoteAccessType
 from ..helper import is_valid_local_config_source
 from ..logging import default_logger
-
-if False:
-    import argparse
+from ..parser import ArgNamespace
 
 PeaLike = TypeVar('PeaLike', bound='BasePea')
 
 
-def Runtime(args: Optional['argparse.Namespace'] = None,
+def Runtime(args: Optional['ArgNamespace'] = None,
             allow_remote: bool = True,
             pea_cls: PeaLike = BasePea, **kwargs):
     """Initialize a :class:`LocalRuntime`, :class:`ContainerRuntime` or :class:`RemoteRuntime`
@@ -28,8 +26,7 @@ def Runtime(args: Optional['argparse.Namespace'] = None,
     """
     if args is None:
         from ..parser import set_pea_parser
-        from ..helper import get_parsed_args
-        _, args, _ = get_parsed_args(kwargs, set_pea_parser())
+        _, args, _ = ArgNamespace(kwargs, set_pea_parser).get_parsed_args()
     if not allow_remote:
         # set the host back to local, as for the remote, it is running "locally"
         if args.host != __default_host__:
@@ -47,7 +44,7 @@ def Runtime(args: Optional['argparse.Namespace'] = None,
         return LocalRuntime(args, pea_cls=pea_cls)
 
 
-def Pod(args: Optional['argparse.Namespace'] = None,
+def Pod(args: Optional['ArgNamespace'] = None,
         allow_remote: bool = True, **kwargs):
     """Initialize a :class:`BasePod`, :class:`JinadRemoteRuntime`, :class:`MutablePod` or :class:`SSHRuntime`
 
@@ -57,8 +54,7 @@ def Pod(args: Optional['argparse.Namespace'] = None,
     """
     if args is None:
         from ..parser import set_pod_parser
-        from ..helper import get_parsed_args
-        _, args, _ = get_parsed_args(kwargs, set_pod_parser())
+        _, args, _ = ArgNamespace(kwargs, set_pod_parser).get_parsed_args()
     if isinstance(args, dict):
         hosts = set()
         for k in args.values():

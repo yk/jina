@@ -1,6 +1,4 @@
-import argparse
 import os
-from typing import Dict, Union
 
 from .. import BaseRuntime
 from ... import PeaLike
@@ -17,7 +15,7 @@ class LocalRuntime(BaseRuntime):
     """
 
     def __init__(self,
-                 args: Union['argparse.Namespace', Dict],
+                 args: 'ArgNamespace',
                  pea_cls: PeaLike = BasePea):
         super().__init__(args)
         self._envs = {'JINA_POD_NAME': self.name,

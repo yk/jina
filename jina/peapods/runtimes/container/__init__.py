@@ -1,18 +1,17 @@
 __copyright__ = "Copyright (c) 2020 Jina AI Limited. All rights reserved."
 __license__ = "Apache-2.0"
 
-import argparse
 import asyncio
 import os
 import time
 from pathlib import Path
-from typing import Dict, Union
 
 from .. import BaseRuntime
 from ...zmq import Zmqlet
 from .... import __ready_msg__, __stop_msg__
-from ....helper import is_valid_local_config_source, kwargs2list, get_non_defaults_args
+from ....helper import is_valid_local_config_source
 from ....logging import JinaLogger
+from ....parser import ArgNamespace
 
 __all__ = ['ContainerRuntime']
 
@@ -25,7 +24,7 @@ class ContainerRuntime(BaseRuntime):
 
     """
 
-    def __init__(self, args: Union['argparse.Namespace', Dict]):
+    def __init__(self, args: 'ArgNamespace'):
         super().__init__(args)
         import docker
         # recompute the control_addr, do not assign client, since this would be an expensive object to
@@ -64,8 +63,8 @@ class ContainerRuntime(BaseRuntime):
         # basically all args in BasePea-docker arg group should be ignored.
         # this prevent setting containerPea twice
         from jina.parser import set_pea_parser
-        non_defaults = get_non_defaults_args(self.args, set_pea_parser(),
-                                             taboo={'uses', 'entrypoint', 'volumes', 'pull_latest'})
+        self.args.parser = set_pea_parser
+        non_defaults = self.args.get_non_defaults_args({'uses', 'entrypoint', 'volumes', 'pull_latest'})
 
         if self.args.pull_latest:
             self.logger.warning(f'pulling {self.args.uses}, this could take a while. if you encounter '
@@ -101,7 +100,7 @@ class ContainerRuntime(BaseRuntime):
         else:
             net_mode = None
 
-        _args = kwargs2list(non_defaults)
+        _args = ArgNamespace.kwargs2list(non_defaults)
         ports = {f'{v}/tcp': v for v in _expose_port} if not net_mode else None
         self._container = client.containers.run(self.args.uses, _args,
                                                 detach=True,

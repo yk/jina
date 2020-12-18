@@ -3,7 +3,7 @@ __license__ = "Apache-2.0"
 
 import argparse
 import os
-
+from typing import Union, Dict, Optional, List, Callable, Any, Set, Tuple
 
 _SHOW_ALL_ARGS = 'JINA_FULL_CLI' in os.environ
 
@@ -788,3 +788,93 @@ class _ColoredHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
 
 
 _chf = _ColoredHelpFormatter
+
+
+class ArgNamespace:
+    def __init__(self, args: Union['argparse.Namespace', Dict],
+                 parser: Optional[Callable[..., 'argparse.ArgumentParser']] = None):
+        self._parser = parser
+        if isinstance(args, argparse.Namespace) or isinstance(args, dict):
+            self._args = args  # type: Union['argparse.Namespace', Dict]
+        else:
+            raise TypeError
+
+    @property
+    def parser(self) -> 'argparse.ArgumentParser':
+        return self._parser()
+
+    @parser.setter
+    def parser(self, value: Callable[..., 'argparse.ArgumentParser']):
+        self._parser = value
+
+    def to_dict(self) -> Dict[str, Any]:
+        if isinstance(self._args, argparse.Namespace):
+            return vars(self._args)
+        elif isinstance(self._args, dict):
+            r = {}
+            for k, v in self._args.items():
+                if isinstance(v, argparse.Namespace):
+                    r[k] = vars(v)
+                elif isinstance(v, list):
+                    r[k] = [vars(_) for _ in v]
+                else:
+                    r[k] = v
+            return r
+
+    def to_namespace(self) -> 'argparse.Namespace':
+        if isinstance(self._args, dict):
+            if self._parser:
+                return self.parser.parse_args(self.kwargs2list(self._args))
+            raise ValueError('need to know the parser when "args" is a dict, given None')
+        else:
+            return self._args
+
+    def to_list(self) -> List[str]:
+        return self.kwargs2list(self.to_dict())
+
+    def get_non_defaults_args(self, exclude_keys: Optional[Set[str]] = None) -> Dict[str, Any]:
+        if exclude_keys is None:
+            exclude_keys = set()
+        non_defaults = {}
+        _defaults = vars(self.parser.parse_args([]))
+        for k, v in self.to_dict().items():
+            if k in _defaults and k not in exclude_keys and _defaults[k] != v:
+                non_defaults[k] = v
+        return non_defaults
+
+    def get_parsed_args(self) -> Tuple[List[str], 'ArgNamespace', List[Any]]:
+        args = self.to_list()
+        try:
+            p_args, unknown_args = self.parser.parse_known_args(args)
+            if unknown_args:
+                from .logging import default_logger
+                default_logger.debug(
+                    f'parser {self._parser!r} can not '
+                    f'recognize the following args: {unknown_args}, '
+                    f'they are ignored. if you are using them from a global args (e.g. Flow), '
+                    f'then please ignore this message')
+        except SystemExit:
+            raise ValueError(f'bad arguments "{args}" with parser {self._parser!r}, '
+                             'you may want to double check your args ')
+        return args, ArgNamespace(p_args), unknown_args
+
+    @staticmethod
+    def kwargs2list(kwargs: Dict) -> List[str]:
+        args = []
+        for k, v in kwargs.items():
+            k = k.replace('_', '-')
+            if v is not None:
+                if isinstance(v, bool):
+                    if v:
+                        args.append(f'--{k}')
+                elif isinstance(v, list):  # for nargs
+                    args.extend([f'--{k}', *(str(vv) for vv in v)])
+                elif isinstance(v, dict):
+                    import json
+                    args.extend([f'--{k}', json.dumps(v)])
+                else:
+                    args.extend([f'--{k}', str(v)])
+        return args
+
+    def __getattr__(self, name: str):
+        return getattr(self._args, name)

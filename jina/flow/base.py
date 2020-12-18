@@ -1,7 +1,6 @@
 __copyright__ = "Copyright (c) 2020 Jina AI Limited. All rights reserved."
 __license__ = "Apache-2.0"
 
-import argparse
 import base64
 import copy
 import os
@@ -21,16 +20,14 @@ from .. import JINA_GLOBAL
 from ..clients import Client
 from ..enums import FlowBuildLevel, PodRoleType, FlowInspectType
 from ..excepts import FlowTopologyError, FlowMissingPodError
-from ..helper import yaml, get_non_defaults_args, complete_path, colored, \
-    get_public_ip, get_internal_ip, typename, get_parsed_args
+from ..helper import yaml, complete_path, colored, \
+    get_public_ip, get_internal_ip, typename
 from ..logging import JinaLogger
 from ..logging.sse import start_sse_logger
+from ..parser import ArgNamespace
 from ..parser import set_client_cli_parser
 from ..peapods.pods.flow import FlowPod
 from ..peapods.pods.gateway import GatewayFlowPod
-
-if False:
-    import argparse
 
 FlowLike = TypeVar('FlowLike', bound='BaseFlow')
 
@@ -46,7 +43,7 @@ class BaseFlow(ExitStack):
     _cls_pod = FlowPod  #: the type of the Pod, can be changed to other class
     _cls_client = Client  #: the type of the Client, can be changed to other class
 
-    def __init__(self, args: Optional['argparse.Namespace'] = None, env: Optional[Dict] = None, **kwargs):
+    def __init__(self, args: Optional['ArgNamespace'] = None, env: Optional[Dict] = None, **kwargs):
         """Initialize a flow object
 
         :param kwargs: other keyword arguments that will be shared by all pods in this flow
@@ -74,21 +71,19 @@ class BaseFlow(ExitStack):
         self._last_changed_pod = ['gateway']  #: default first pod is gateway, will add when build()
         self._update_args(args, **kwargs)
         self._env = env  #: environment vars shared by all pods in the flow
-        if isinstance(self.args, argparse.Namespace):
+        if isinstance(self.args, ArgNamespace):
             self.logger = JinaLogger(self.__class__.__name__, **vars(self.args))
         else:
             self.logger = JinaLogger(self.__class__.__name__)
 
     def _update_args(self, args, **kwargs):
         from ..parser import set_flow_parser
-        _flow_parser = set_flow_parser()
         if args is None:
-            from ..helper import get_parsed_args
-            _, args, _ = get_parsed_args(kwargs, _flow_parser)
+            _, args, _ = ArgNamespace(kwargs, set_flow_parser).get_parsed_args()
 
         self.args = args
         self._common_kwargs = kwargs
-        self._kwargs = get_non_defaults_args(args, _flow_parser)  #: for yaml dump
+        self._kwargs = ArgNamespace(args, set_flow_parser).get_non_defaults_args()  #: for yaml dump
 
     @classmethod
     def to_yaml(cls, representer, data):
@@ -554,7 +549,7 @@ class BaseFlow(ExitStack):
         if 'host' not in kwargs:
             kwargs['host'] = self.host
 
-        _, args, _ = get_parsed_args(kwargs, set_client_cli_parser())
+        _, args, _ = ArgNamespace(kwargs, set_client_cli_parser).get_parsed_args()
         return self._cls_client(args)
 
     @property

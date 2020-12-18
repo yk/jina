@@ -5,9 +5,10 @@ from typing import List
 from ... import __default_host__
 from ...enums import SchedulerType, SocketType, PeaRoleType
 from ...helper import random_port, get_random_identity, get_public_ip, get_internal_ip, is_valid_local_config_source
+from ...parser import ArgNamespace
 
 
-def _set_peas_args(args: Namespace, head_args: Namespace = None, tail_args: Namespace = None) -> List[Namespace]:
+def _set_peas_args(args: Namespace, head_args: Namespace = None, tail_args: Namespace = None) -> List[ArgNamespace]:
     result = []
     for _ in range(args.parallel):
         _args = copy.deepcopy(args)
@@ -32,7 +33,7 @@ def _set_peas_args(args: Namespace, head_args: Namespace = None, tail_args: Name
             _args.host_in = _fill_in_host(bind_args=head_args, connect_args=_args)
         if tail_args:
             _args.host_out = _fill_in_host(bind_args=tail_args, connect_args=_args)
-        result.append(_args)
+        result.append(ArgNamespace(_args))
     return result
 
 
@@ -44,7 +45,7 @@ def _set_after_to_pass(args):
         args.uses_after = '_pass'
 
 
-def _copy_to_head_args(args: Namespace, is_push: bool, as_router: bool = True) -> Namespace:
+def _copy_to_head_args(args: ArgNamespace, is_push: bool, as_router: bool = True) -> ArgNamespace:
     """Set the outgoing args of the head router
     """
 
@@ -77,7 +78,7 @@ def _copy_to_head_args(args: Namespace, is_push: bool, as_router: bool = True) -
     return _head_args
 
 
-def _copy_to_tail_args(args: Namespace, as_router: bool = True) -> Namespace:
+def _copy_to_tail_args(args: ArgNamespace, as_router: bool = True) -> ArgNamespace:
     """Set the incoming args of the tail router
     """
     _tail_args = copy.deepcopy(args)

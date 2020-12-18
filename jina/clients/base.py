@@ -1,7 +1,6 @@
 __copyright__ = "Copyright (c) 2020 Jina AI Limited. All rights reserved."
 __license__ = "Apache-2.0"
 
-import argparse
 import os
 from typing import Callable, Union, Optional, Iterator
 
@@ -17,6 +16,7 @@ from ..logging import default_logger, JinaLogger
 from ..logging.profile import TimeContext, ProgressBar
 from ..proto import jina_pb2_grpc
 from ..types.request import Request
+from ..parser import ArgNamespace
 
 InputFnType = Union[GeneratorSourceType, Callable[..., GeneratorSourceType]]
 CallbackFnType = Optional[Callable[..., None]]
@@ -30,7 +30,7 @@ class BaseClient:
         Please use :class:`Client` or :class:`AsyncClient`.
     """
 
-    def __init__(self, args: 'argparse.Namespace'):
+    def __init__(self, args: 'ArgNamespace'):
         """
         :param args: args provided by the CLI
         """
@@ -82,7 +82,7 @@ class BaseClient:
 
     def _get_requests(self, **kwargs) -> Iterator['Request']:
         """Get request in generator"""
-        _kwargs = vars(self.args)
+        _kwargs = self.args.to_dict()
         _kwargs['data'] = self.input_fn
         # override by the caller-specific kwargs
         _kwargs.update(kwargs)

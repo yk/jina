@@ -13,6 +13,7 @@ from .. import Runtime
 from ..peas import BasePea
 from ..peas.headtail import HeadPea, TailPea
 from ...enums import *
+from ...parser import ArgNamespace
 
 
 class BasePod(ExitStack):
@@ -20,7 +21,7 @@ class BasePod(ExitStack):
     Internally, the peas can run with the process/thread backend. They can be also run in their own containers
     """
 
-    def __init__(self, args: Union['argparse.Namespace', Dict]):
+    def __init__(self, args: 'ArgNamespace'):
         """
 
         :param args: arguments parsed from the CLI
@@ -88,12 +89,12 @@ class BasePod(ExitStack):
         return f'{self.tail_args.host_out}:{self.tail_args.port_out} ({self.head_args.socket_out!s})'
 
     @property
-    def first_pea_args(self) -> Namespace:
+    def first_pea_args(self) -> ArgNamespace:
         """Return the first non-head/tail pea's args """
         # note this will be never out of boundary
         return self.peas_args['peas'][0]
 
-    def _parse_args(self, args: Namespace) -> Dict[str, Optional[Union[List[Namespace], Namespace]]]:
+    def _parse_args(self, args: ArgNamespace) -> Dict[str, Optional[Union[List[ArgNamespace], ArgNamespace]]]:
         peas_args = {
             'head': None,
             'tail': None,
@@ -201,7 +202,7 @@ class BasePod(ExitStack):
 
     def start_sentinels(self) -> None:
         self.sentinel_threads = []
-        if isinstance(self._args, argparse.Namespace) and getattr(self._args, 'shutdown_idle', False):
+        if isinstance(self._args, ArgNamespace) and getattr(self._args, 'shutdown_idle', False):
             self.sentinel_threads.append(Thread(target=self.close_if_idle,
                                                 name='sentinel-shutdown-idle',
                                                 daemon=True))

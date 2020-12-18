@@ -46,7 +46,7 @@ class HubIO:
         - :command:`jina hub pull jinahub/pod.dummy_mwu_encoder:0.0.6` to download the image
     """
 
-    def __init__(self, args: 'argparse.Namespace'):
+    def __init__(self, args: 'ArgNamespace'):
         self.logger = JinaLogger(self.__class__.__name__, **vars(args))
         self.args = args
         self._load_docker_client()

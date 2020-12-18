@@ -1,16 +1,17 @@
 from argparse import Namespace
-from typing import Union, Dict, Optional
+from typing import Dict, Optional
 
 from .api import PeaJinadAPI, get_jinad_api
 from .. import BaseRemoteRuntime
-from .....helper import cached_property, namespace_to_dict, colored, typename
+from .....helper import cached_property, colored, typename
+from .....parser import ArgNamespace
 
 
 class JinadRemoteRuntime(BaseRemoteRuntime):
     """A JinadRemoteRuntime that will spawn a remote `BasePea` or `BasePod` via REST communication with a jinad instance
     """
 
-    def __init__(self, args: Union['Namespace', Dict], kind: str):
+    def __init__(self, args: 'ArgNamespace', kind: str):
         super().__init__(args, kind=kind)
         if isinstance(self.args, Namespace):
             self.ctrl_timeout = self.args.timeout_ctrl
@@ -27,7 +28,7 @@ class JinadRemoteRuntime(BaseRemoteRuntime):
 
     def spawn_remote(self, **kwargs) -> Optional[str]:
         if self.api.is_alive:
-            args = namespace_to_dict(self.args)
+            args = self.args.to_dict()
             if self.api.upload(args, **kwargs):
                 return self.api.create(args, **kwargs)
 

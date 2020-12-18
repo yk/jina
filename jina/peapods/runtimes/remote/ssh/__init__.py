@@ -1,11 +1,9 @@
-import argparse
 from subprocess import Popen, PIPE
-from typing import Union, Dict
 
 from .. import BaseRemoteRuntime
 from ..... import __ready_msg__, __stop_msg__
-from .....helper import get_non_defaults_args, kwargs2list
 from .....logging import JinaLogger
+from .....parser import ArgNamespace
 
 
 class SSHRuntime(BaseRemoteRuntime):
@@ -26,21 +24,23 @@ class SSHRuntime(BaseRemoteRuntime):
     def is_idle(self) -> bool:
         raise NotImplementedError
 
-    def __init__(self, args: Union['argparse.Namespace', Dict], kind: str):
+    def __init__(self, args: 'ArgNamespace', kind: str):
         super().__init__(args, kind=kind)
 
     @property
     def pea_command(self) -> str:
         from jina.parser import set_pea_parser
-        non_defaults = get_non_defaults_args(self.args, set_pea_parser(), taboo={'host'})
-        _args = kwargs2list(non_defaults)
+        self.args.parser = set_pea_parser
+        non_defaults = self.args.get_non_defaults_args(exclude_keys={'host'})
+        _args = ArgNamespace.kwargs2list(non_defaults)
         return f'jina pea {" ".join(_args)}'
 
     @property
     def pod_command(self) -> str:
         from jina.parser import set_pod_parser
-        non_defaults = get_non_defaults_args(self.args, set_pod_parser(), taboo={'host'})
-        _args = kwargs2list(non_defaults)
+        self.args.parser = set_pod_parser
+        non_defaults = self.args.get_non_defaults_args(exclude_keys={'host'})
+        _args = ArgNamespace.kwargs2list(non_defaults)
         return f'jina pod {" ".join(_args)}'
 
     @property

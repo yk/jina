@@ -20,7 +20,7 @@ __all__ = ['GatewayPea']
 class GatewayPea(BasePea):
 
     def __init__(self,
-                 args: Union['argparse.Namespace', Dict],
+                 args: 'ArgNamespace',
                  ctrl_addr: str,
                  ctrl_with_ipc: bool,
                  **kwargs):

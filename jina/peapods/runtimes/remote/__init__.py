@@ -1,9 +1,11 @@
 import argparse
-from typing import Union, Dict
+from typing import Dict
 
 from .. import BaseRuntime
 from ...peas import PeaRoleType
 from ...zmq import Zmqlet, send_ctrl_message
+
+from ....parser import ArgNamespace
 
 __all__ = ['BaseRemoteRuntime']
 
@@ -17,7 +19,7 @@ class BaseRemoteRuntime(BaseRuntime):
 
     """
 
-    def __init__(self, args: Union['argparse.Namespace', Dict], kind: str):
+    def __init__(self, args: 'ArgNamespace', kind: str):
         super().__init__(args)
         self.kind = kind
         self.all_ctrl_addr = []
@@ -32,7 +34,7 @@ class BaseRemoteRuntime(BaseRuntime):
             for args in self.args['peas']:
                 ctrl_addr, _ = Zmqlet.get_ctrl_address(args.host, args.port_ctrl, args.ctrl_with_ipc)
                 self.all_ctrl_addr.append(ctrl_addr)
-        elif isinstance(self.args, argparse.Namespace):
+        elif isinstance(self.args, ArgNamespace):
             self.daemon = self.args.daemon
             self.all_ctrl_addr.append(self.ctrl_addr)
 
