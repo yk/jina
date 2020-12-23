@@ -1,9 +1,8 @@
 import argparse
 import os
-from typing import Dict, Union
+from typing import Type
 
 from .. import BaseRuntime
-from ... import PeaLike
 from ...peas import BasePea
 from .... import __stop_msg__
 
@@ -17,8 +16,8 @@ class LocalRuntime(BaseRuntime):
     """
 
     def __init__(self,
-                 args: Union['argparse.Namespace', Dict],
-                 pea_cls: PeaLike = BasePea):
+                 args: 'argparse.Namespace',
+                 pea_cls: Type['BasePea'] = BasePea):
         super().__init__(args)
         self._envs = {'JINA_POD_NAME': self.name,
                       'JINA_LOG_ID': self.args.log_id}
@@ -61,7 +60,7 @@ class LocalRuntime(BaseRuntime):
         try:
             self.set_environment_vars()
             with self.pea as pea:
-                pea.run(self.is_ready_event)
+                pea.run(self.is_ready)
         except Exception as ex:
             self.logger.info(f'runtime run caught {repr(ex)}')
         finally:

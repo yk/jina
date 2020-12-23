@@ -58,9 +58,9 @@ class BaseRemoteRuntime(BaseRuntime):
         finally:
             self.logger.info(f'Ended monitoring remote')
 
-    def send_terminate_signal(self) -> None:
+    def cancel_running_loop(self) -> None:
         """Gracefully close this pea and release all resources """
-        if self.is_ready_event.is_set() and self.all_ctrl_addr:
+        if self.is_ready.is_set() and self.all_ctrl_addr:
             for ctrl_addr in self.all_ctrl_addr:
                 send_ctrl_message(address=ctrl_addr, cmd='TERMINATE',
                                   timeout=self.ctrl_timeout)
@@ -74,7 +74,7 @@ class BaseRemoteRuntime(BaseRuntime):
         close since the `LocalRuntime` in the remote machine will ensure that the `BasePea` is properly closed.
          """
         # Needed to override from Runtime because this forces shutdown event to end monitoring remote
-        self.send_terminate_signal()
+        self.cancel_running_loop()
         self.unset_ready()
         self.is_shutdown.set()
         self.logger.close()

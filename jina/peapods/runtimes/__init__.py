@@ -2,13 +2,11 @@ import argparse
 import multiprocessing
 import threading
 from multiprocessing.synchronize import Event
-from typing import Dict, Union
 
-from jina.enums import PeaRoleType
-from jina.excepts import PeaFailToStart
+from jina.excepts import RuntimeFailToStart
 from jina.helper import typename
 from jina.logging import JinaLogger
-from jina.peapods.zmq import send_ctrl_message, Zmqlet
+from ... import __stop_msg__
 
 __all__ = ['BaseRuntime']
 
@@ -83,54 +81,64 @@ class RuntimeMeta(type):
 
 
 class BaseRuntime(metaclass=RuntimeMeta):
-    """BaseRuntime is a process or thread providing the support to run different :class:`BasePea` in different environments.
-    It manages the lifetime of these `BasePea` objects living in `Local`, `Remote`, or `Container` environment.
+    """BaseRuntime is a process or thread providing the support to run different :class:`BaseRuntime` in different environments.
+    It manages the lifetime of these `BaseRuntime` objects living in `Local`, `Remote`, or `Container` environment.
 
     Inherited classes must define their own `run` method that is the one that will be run in a separate process or thread than the main process
     """
 
-    _name_decor = 'R[%s]'  #: for decorating names
-
-    def __init__(self, args: Union['argparse.Namespace', Dict]):
+    def __init__(self, args: 'argparse.Namespace'):
         super().__init__()
         self.args = args
-        self.name = self.__class__.__name__  #: this is the process name
-
-        self.is_ready_event = _get_event(self)
+        self.name = self.args.name or self.__class__.__name__
+        self.is_ready = _get_event(self)
         self.is_shutdown = _get_event(self)
-        self.ready_or_shutdown = _make_or_event(self, self.is_ready_event, self.is_shutdown)
-        self.is_shutdown.clear()
-        if 'daemon' in args:
-            self.daemon = args.daemon
-        if 'name' in self.args and self.args.name:
-            self.name = self._name_decor % self.args.name
-        if 'role' in self.args and self.args.role == PeaRoleType.PARALLEL:
-            self.name = self._name_decor % f'{self.args.name}-{self.args.pea_id}'
-        if 'role' in self.args and self.args.role == PeaRoleType.HEAD:
-            self.name = self._name_decor % f'{self.args.name}-head'
-        if 'role' in self.args and self.args.role == PeaRoleType.TAIL:
-            self.name = self._name_decor % f'{self.args.name}-tail'
-        if 'host' in self.args and 'port_ctrl' in self.args and 'ctrl_with_ipc' in self.args:
-            self.ctrl_addr, self.ctrl_with_ipc = Zmqlet.get_ctrl_address(self.args.host, self.args.port_ctrl,
-                                                                         self.args.ctrl_with_ipc)
+        self.ready_or_shutdown = _make_or_event(self, self.is_ready, self.is_shutdown)
+        self.logger = JinaLogger(self.name,
+                                 log_id=self.args.log_id,
+                                 log_config=self.args.log_config)
 
-        if 'log_id' in self.args and 'log_config' in self.args:
-            self.logger = JinaLogger(self.name,
-                                     log_id=self.args.log_id,
-                                     log_config=self.args.log_config)
-        else:
-            self.logger = JinaLogger(self.name)
+    def before_running_loop(self):
+        pass
+
+    def after_running_loop(self):
+        pass
+
+    def forever_running_loop(self):
+        pass
+
+    def cancel_running_loop(self):
+        raise NotImplementedError
 
     def run(self):
+        """ Method representing the process’s activity.
+
+        .. note::
+            You MUST override this method in a subclass. In your overrided function,
+            you MUST implement ``self.is_ready.set()`` to BEFORE you move into the forever loop.
+        """
+        try:
+            self.before_running_loop()
+            self.is_ready.set()
+            self.forever_running_loop()
+        except Exception as ex:
+            self.logger.info(f'{self.__class__!r} run caught {repr(ex)}')
+        finally:
+            self.after_running_loop()
+            self.logger.success(__stop_msg__)
+            self.is_ready.clear()
+            self.is_shutdown.set()
+
         raise NotImplementedError
 
     def start(self):
-        super().start()
-        if isinstance(self.args, dict):
-            _timeout = getattr(self.args['peas'][0], 'timeout_ready', -1)
-        else:
-            _timeout = getattr(self.args, 'timeout_ready', -1)
+        """ Start the :class:`Runtime`’s activity.
 
+        This must be called at most once per :class:`Runtime` object.
+        It arranges for the :class:`Runtime`’s :meth:`run` method to be invoked in a separate process/thread.
+        """
+        super().start()  #: required here to call process/thread method
+        _timeout = self.args.timeout_ready
         if _timeout <= 0:
             _timeout = None
         else:
@@ -139,60 +147,31 @@ class BaseRuntime(metaclass=RuntimeMeta):
         if self.ready_or_shutdown.wait(_timeout):
             if self.is_shutdown.is_set():
                 # return too early and the shutdown is set, means something fails!!
-                self.logger.critical(f'fails to start {typename(self)} with name {self.name}, '
+                self.logger.critical(f'fails to start {typename(self)}:{self.name}, '
                                      f'this often means the executor used in the pod is not valid')
-                raise PeaFailToStart
+                raise RuntimeFailToStart
             else:
                 self.logger.info(f'ready to listen')
-            return self
         else:
             raise TimeoutError(
-                f'{typename(self)} with name {self.name} can not be initialized after {_timeout * 1e3}ms')
-
-    def set_ready(self):
-        """Set the `is_ready_event` to indicate that the `BasePea` managed by the Runtime is ready to start
-         receiving messages"""
-        self.is_ready_event.set()
-
-    def unset_ready(self):
-        """Clear the `is_ready_event` to indicate that the `BasePea` managed by the Runtime is not anymore ready to start
-         receiving messages"""
-        self.is_ready_event.clear()
-
-    def set_shutdown(self):
-        """Set the `is_shutdown` event to indicate that the `BasePea` managed by the Runtime is closed and the parallel process
-        can be shutdown"""
-        self.is_shutdown.set()
+                f'{typename(self)}:{self.name} can not be initialized after {_timeout * 1e3}ms')
 
     @property
     def status(self):
-        """Send the control signal ``STATUS`` to the manages `BasePea` and return the status """
-        return send_ctrl_message(self.ctrl_addr, 'STATUS', timeout=self.args.timeout_ctrl)
-
-    @property
-    def is_ready(self) -> bool:
-        status = self.status
-        return status and status.is_ready
-
-    @property
-    def is_idle(self) -> bool:
         raise NotImplementedError
 
-    def send_terminate_signal(self):
-        """Send a terminate signal to the `BasePea` supported by this `Runtime` """
-        return send_ctrl_message(self.ctrl_addr, 'TERMINATE', timeout=self.args.timeout_ctrl)
-
     def close(self) -> None:
-        """Close this `Runtime` by sending a `terminate signal` to the managed `BasePea`. Wait to
-         be sure that the `BasePea` is properly closed to join the parallel process """
-        self.send_terminate_signal()
+        """Close this `Runtime` by sending a `terminate signal` to the managed `BaseRuntime`. Wait to
+         be sure that the `BaseRuntime` is properly closed to join the parallel process """
+        self.cancel_running_loop()
         self.is_shutdown.wait()
         self.logger.close()
-        if not self.daemon:
+        if not self.args.daemon:
             self.join()
 
     def __enter__(self):
-        return self.start()
+        self.start()
+        return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()

@@ -7,6 +7,7 @@ import os
 import time
 from pathlib import Path
 from typing import Dict, Union
+from sys import platform
 
 from .. import BaseRuntime
 from ...zmq import Zmqlet
@@ -32,7 +33,7 @@ class ContainerRuntime(BaseRuntime):
         # copy in the new process generated
         client = docker.from_env()
 
-        from sys import platform
+
         # Related to potential docker-in-docker communication. If `ContainerPea` lives already inside a container.
         # it will need to communicate using the `bridge` network.
         if platform in ('linux', 'linux2'):
@@ -122,7 +123,7 @@ class ContainerRuntime(BaseRuntime):
         def check_ready():
             while not self.is_ready:
                 time.sleep(0.1)
-            self.is_ready_event.set()
+            self.is_ready.set()
             self.logger.success(__ready_msg__)
             return True
 

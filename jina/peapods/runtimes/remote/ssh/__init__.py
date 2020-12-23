@@ -64,7 +64,7 @@ class SSHRuntime(BaseRemoteRuntime):
                     msg = line.strip()
                     logger.info(msg)
                     if __ready_msg__ in msg:
-                        self.is_ready_event.set()
+                        self.is_ready.set()
                         self.logger.success(__ready_msg__)
                     if __stop_msg__ in msg:
                         break
